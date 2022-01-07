@@ -3,11 +3,12 @@ const app = express()
 const port = 3000
 const cookieParser = require('cookie-parser')
 const {User} = require('./models/User')
+const cors = require('cors');
 
 const config = require('./config/key');
 
 app.use(express.urlencoded({extended: true}));
-
+app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
