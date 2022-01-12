@@ -14,6 +14,8 @@ app.use(cookieParser());
 
 const mongoose = require('mongoose');
 const { Paper } = require('./models/Paper')
+const { Article } = require('./models/Article')
+const { Reply } = require('./models/Reply')
 
 mongoose.connect(config.mogoURI, {
   useNewUrlParser:true,useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false
@@ -86,6 +88,143 @@ app.post('/login', (req, res) => {
   })
 })
 
+app.post('/article', (req, res) => {
+  const article = new Article(req.body)
+
+  article.save((err) => {
+    if(err) {
+      let errMessage = err.message;
+      return res.json({ success: false, errMessage})}
+    else {
+      return res.status(200).json({success: true})
+    }
+  })
+})
+
+app.get('/article', (req, res) => {
+  const id = req.query.id;
+  Article.findById(id, (err, list) => {
+    return res.json({
+      list
+    })
+  })
+})
+
+app.delete('/article', (req, res) => {
+  const id = req.query.id;
+  Article.deleteOne({ _id: id }, (err, list) => {
+    return res.status(200).json({success: true})
+  })
+})
+
+app.put('/article', (req, res) => {
+  const id = req.query.id;
+  Article.findByIdAndUpdate({ _id: id }, { $push: { contents: req.body.contents } })
+})
+
+app.post('/articleLike', async (req, res) => {
+  const id = req.query.id;
+  let likeCount = 0;
+  await Article.findById(id, (err, list) => {
+    likeCount = list?list.likeCount:0
+  })
+  Article.findByIdAndUpdate(id, { $set: { likeCount: likeCount + 1 } }, (err) => {
+    if(err) {
+      let errMessage = err.message;
+      return res.json({ success: false, errMessage})}
+    else {
+      return res.status(200).json({success: true})
+    }
+  })
+})
+
+app.post('/articleUnLike', async (req, res) => {
+  const id = req.query.id;
+  let unLikeCount = 0;
+  await Arrticle.findById(id, (err, list) => {
+    unLikeCount = list?list.unLikeCount:0
+  })
+  Article.findByIdAndUpdate(id, { $set: { unLikeCount: unLikeCount + 1 } }, (err) => {
+    if(err) {
+      let errMessage = err.message;
+      return res.json({ success: false, errMessage})}
+    else {
+      return res.status(200).json({success: true})
+    }
+  })
+})
+
+app.get('/articleList', async (req, res) => {
+  const page = parseInt(req.query.page || '1', 10);
+    const totalCount = await Article.countDocuments().exec();
+    let hasNext = true;
+    if(((page -1) * 1)+10 >=totalCount) {
+      hasNext = false
+    }else {
+      hasNext = true;
+    }
+  let skip = (page - 1) * 10;
+  let article = await Article.aggregate([
+    {$match: {}},
+    {$skip: skip},
+    {$limit : 10},
+    { $lookup: {
+      from: 'Reply',
+      localField: 'id',
+      foreignField: 'articleId',
+      as: 'replys'
+    }},
+    {$project: {
+      title:1,
+      date:1,
+      writer:1,
+      likeCount:1,
+      unLikeCount:1,
+      replysCount: { $size: '$replys'}
+    }}
+  ]).exec();
+  let maxPage = Math.ceil(totalCount/10);
+  return res.json ({
+    article,
+    totalCount,
+    page,
+    maxPage,
+    hasNext
+  })
+})
+
+app.post('/reply', async (req, res) => {
+  const id = req.query.id;
+  try {
+    await Article.findById(id);
+    req.body.articleId = id;
+    const reply = new Reply(req.body)
+    reply.save((err) => {
+      if(err) {
+        let errMessage = err.message;
+        return res.json({ success: false, errMessage})}
+      else {
+        return res.status(200).json({success: true})
+      }
+    })
+  } catch (error) {
+    return res.status(200).json({success: false})
+  }
+})
+
+app.put('/reply', async (req, res) => {
+  const id = req.query.id;
+  Reply.findByIdAndUpdate({ _id: id }, { $push: { content: req.body.content } })
+})
+
+app.get('/replyList', async (req, res) => {
+  const id = req.query.id;
+  await Reply.find({articleId : id},(err,list) => {
+    return res.json({
+      list
+    })
+  })
+})
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`)
