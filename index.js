@@ -119,16 +119,7 @@ app.delete('/article', (req, res) => {
 
 app.put('/article', (req, res) => {
   const id = req.query.id;
-  Article.findByIdAndUpdate({ _id: id }, { $push: { contents: req.body.contents } })
-})
-
-app.post('/articleLike', async (req, res) => {
-  const id = req.query.id;
-  let likeCount = 0;
-  await Article.findById(id, (err, list) => {
-    likeCount = list?list.likeCount:0
-  })
-  Article.findByIdAndUpdate(id, { $set: { likeCount: likeCount + 1 } }, (err) => {
+  Article.findByIdAndUpdate({ _id: id }, { $set: { contents: req.body.contents } }, (err) => {
     if(err) {
       let errMessage = err.message;
       return res.json({ success: false, errMessage})}
@@ -138,18 +129,27 @@ app.post('/articleLike', async (req, res) => {
   })
 })
 
-app.post('/articleUnLike', async (req, res) => {
+app.post('/articleLike', async (req, res) => {
   const id = req.query.id;
-  let unLikeCount = 0;
-  await Arrticle.findById(id, (err, list) => {
-    unLikeCount = list?list.unLikeCount:0
-  })
-  Article.findByIdAndUpdate(id, { $set: { unLikeCount: unLikeCount + 1 } }, (err) => {
+  Article.findOneAndUpdate({ _id: id }, { $inc: {"likeCount" : 1 } }, (err, list) => {
     if(err) {
       let errMessage = err.message;
       return res.json({ success: false, errMessage})}
     else {
-      return res.status(200).json({success: true})
+      console.log(list);
+      return res.status(200).json({success: true, likeCount: list.likeCount + 1})
+    }
+  })
+})
+
+app.post('/articleUnLike', async (req, res) => {
+  const id = req.query.id;
+  Article.findByIdAndUpdate({ _id: id }, { $inc: {unLikeCount : 1 }}, (err, list) => {
+    if(err) {
+      let errMessage = err.message;
+      return res.json({ success: false, errMessage})}
+    else {
+      return res.status(200).json({success: true, unlikeCount: list.unLikeCount + 1})
     }
   })
 })
@@ -219,10 +219,11 @@ app.put('/reply', async (req, res) => {
 
 app.get('/replyList', async (req, res) => {
   const id = req.query.id;
-  await Reply.find({articleId : id},(err,list) => {
-    return res.json({
-      list
-    })
+  const totalCount = await Reply.find({articleId : id}).countDocuments().exec();
+  const replyList = await Reply.find({articleId : id}).exec();
+  return res.json ({
+    replyList,
+    totalCount
   })
 })
 
